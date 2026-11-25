@@ -7,7 +7,7 @@ Four Databricks SQL notebooks for the Bricking News article on Genie ZeroOps. Th
 | `lab_01_green_baseline` | Seed two revisions of the same purchase feed. | 3 distinct USD purchases, 2,500 cents total. The TV app accounts for 2 purchases and 2,000 cents. |
 | `lab_02_schema_drift` | Publish against v1, then switch the run parameter to v2. | v1 succeeds. v2 fails on `amount_cents`. The new name is `amount_minor`, and the unit stays USD cents. |
 | `lab_03_silent_underfill` | Write a 100-row batch and a separate 10-row batch. | Both jobs finish successfully. The 10-row batch fails the displayed data contract. DQM is a separate, optional trial. |
-| `lab_04_review_the_fix` | Trigger a failing check, review the source and compare guidance. | A patch should restore 2 unique TV-app purchases and 2,000 cents while keeping the assertion. Optional Git-source variant exercises the PR path. |
+| `lab_04_review_the_fix` | Run the green contract, then use `channel_value=tv-app` to trigger a reviewable failure. | The normal value passes. The deliberate value fails, and a correct patch preserves 2 unique TV-app purchases and 2,000 cents. Optional Git-source variant exercises the PR path. |
 
 ## Requirements
 
