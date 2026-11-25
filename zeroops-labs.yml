@@ -23,6 +23,8 @@ resources:
           default: ${var.schema}
         - name: feed_table
           default: zops_feed_v1
+        - name: amount_column
+          default: amount_cents
       tasks:
         - task_key: publish_daily_revenue
           max_retries: 0
@@ -53,6 +55,10 @@ resources:
       name: "ZeroOps Lab 04 - Review the fix"
       max_concurrent_runs: 1
       parameters:
+        - name: catalog
+          default: ${var.catalog}
+        - name: schema
+          default: ${var.schema}
         - name: channel_value
           default: tv_app
       tasks:
@@ -61,7 +67,3 @@ resources:
           notebook_task:
             notebook_path: ./lab_04__review_the_fix.ipynb
             warehouse_id: ${var.warehouse_id}
-            base_parameters:
-              catalog: ${var.catalog}
-              schema: ${var.schema}
-              channel_value: tv_app

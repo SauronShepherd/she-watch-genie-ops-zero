@@ -1,16 +1,25 @@
 # Validation record
 
-Validated on 2026-11-25 in workspace `dbc-916267ef-3b9b.cloud.databricks.com` with Databricks CLI 1.22.1, profile `sda`, catalog `sda_dev`, schema `zeroops_lab_angel_20261125` and warehouse `c0df22691f7b9ffc`. Genie ZeroOps inbox observations and DQM anomaly detection remain optional product exercises. The bundle itself was validated, deployed and exercised through both green and deliberate failure paths.
+Run in Databricks on AWS on 25 November 2026 with CLI 1.22.1, the `dev` target, a Serverless SQL warehouse and a disposable Unity Catalog schema. Bundle validation and deployment succeeded. Run IDs refer to the private test workspace. The fixture data are synthetic.
 
-| Check | Expected | Record on first run |
+| Lab case | Run ID | What Databricks returned |
 | --- | --- | --- |
-| Bundle | Four independent manual jobs with one SQL notebook task each | `Validation OK!`, deployment created four jobs and uploaded eight files |
-| Lab 01 | 3 distinct USD purchases, 2,500 total cents, 2 TV-app purchases and 2,000 TV-app cents | Run `481521479257870` succeeded. Independent query returned `3 / 3 / 2500`. |
-| Lab 02 v1 | One USD summary row with 3 purchases and 2,500 cents | Run `637874234260576` succeeded. `zops_daily_revenue` returned `1 / 3 / 2500`. |
-| Lab 02 v2 | Failed task references unresolved `amount_cents`; v2 schema has `amount_minor` | Run `42345021874650` failed with the expected `UNRESOLVED_COLUMN` suggestion for `amount_minor`. |
-| Lab 03 baseline | 100 rows for `sample_01` with 100 distinct event IDs | Run `80988534842520` succeeded. Independent query returned `100 / 100 / baseline`. |
-| Lab 03 underfill | 10 rows for `thin_01` with 10 distinct event IDs and a visible non-PASS contract status | Run `92789719652764` succeeded. Independent query returned `10 / 10 / thin`. |
-| Lab 04 green | 2 distinct USD TV-app purchases and 2,000 cents with the gate intact | Run `821258069765679` succeeded with the default `channel_value=tv_app`. |
-| Lab 04 deliberate failure | Assertion fails with `tv-app` while the source value is `tv_app` | Run `1063653230259510` failed with the expected user-raised contract exception. |
+| 01 · Seed and baseline | `346479869398460` | Success. The fixture assertion checked three distinct USD purchases and 2,500 cents, including two TV-app purchases and 2,000 cents. |
+| 02 · v1 with `amount_cents` | `172300153188146` | Success. The published result passed reconciliation. |
+| 02 · v2 with `amount_cents` | `159476446860733` | Expected failure with SQLSTATE `42703`. Databricks suggested `amount_minor`. |
+| 02 · v2 with `amount_minor` | `904175530721566` | Success. Reconciliation passed. The output contained one USD summary with three purchases and 2,500 cents. |
+| 03 · Normal batch | `542668437909294` | Success. 100 rows, 100 distinct event IDs, `PASS`. |
+| 03 · Thin batch | `550377090563883` | Success. 10 rows, 10 distinct event IDs, `UNDERFILLED_OR_DUPLICATE`. |
+| 03 · Replay the thin batch | `542995932839040` | Success. The batch still had 10 rows and 10 distinct event IDs. |
+| 03 · Reuse thin batch ID in baseline mode | `339342823338609` | Expected failure in the replay guard. The existing batch stayed at ten rows. |
+| 04 · Workspace code and `tv_app` | `110681501421053` | Success. The TV-app assertion passed. |
+| 04 · Same workspace code and `tv-app` | `863275523711885` | Expected contract assertion failure with SQLSTATE `P0001`. |
+| 04 · Restore `tv_app` | `61783004573596` | Success with the same code. The configuration change restored the contract. |
+| 04 · Remote Git, literal typo | `70892926403499` | Expected contract assertion failure with SQLSTATE `P0001`. Databricks reported the requested snapshot `f4590bbc04f59344084a96d104c0ce4a78a28140`. |
+| 04 · Remote Git, parameterized predicate | `505104972544114` | Success with identical run inputs and fixture. Databricks reported snapshot `6c6b7b4d836865743e49b404fae20fb30fe7eb25`. |
 
-For each future ZeroOps investigation, capture the signal, first useful evidence, root-cause accuracy, proposed action, what a reviewer changed and the recovery result. Keep the times for the actual failure, first insight, reviewed fix and verified recovery separate. A notification, a generated PR and a closed insight are distinct outcomes.
+An independent SQL read after these runs confirmed 2 unique TV-app purchases and 2,000 cents, three purchases and 2,500 cents for recovered revenue, and 100 and 10 distinct event IDs in the two viewing batches. The initial Lab 03 version used a parameterized `DESCRIBE HISTORY` form rejected by the warehouse parser. The current notebook queries batch rows and ingestion timestamps. Inspect the Delta History tab separately for commit evidence.
+
+The Git replay used one-time Jobs runs pinned to existing commits. The ZeroOps inbox, the custom-instruction comparison, a trained DQM alert and the agent-created PR remain separate product exercises. The run evidence above covers the incident inputs and recovery outputs.
+
+For each ZeroOps investigation, record the failed run ID, source revision or notebook path, the evidence cited, what caused the failure, the proposed action and the verified outcome. Also record missing or inaccurate insights. Measure time to the first useful evidence separately from time to verified recovery. For DQM, add the training or scan status and timestamp. For Git, record the candidate commit, who reviewed it, the candidate run and the PR if one was opened.

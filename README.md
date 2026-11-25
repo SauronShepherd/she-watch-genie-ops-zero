@@ -5,9 +5,9 @@ Four Databricks SQL notebooks for the Bricking News article on Genie ZeroOps. Th
 | Lab | What you do | What to look for |
 | --- | --- | --- |
 | `lab_01_green_baseline` | Seed two revisions of the same purchase feed. | 3 distinct USD purchases, 2,500 cents total. The TV app accounts for 2 purchases and 2,000 cents. |
-| `lab_02_schema_drift` | Publish against v1, then switch the run parameter to v2. | v1 succeeds. v2 fails on `amount_cents`. The new name is `amount_minor`, and the unit stays USD cents. |
+| `lab_02_schema_drift` | Publish against v1, switch to v2, then select the v2 amount column. | The old column fails against v2. The recovery run reconciles back to the v1 total of 2,500 USD cents. |
 | `lab_03_silent_underfill` | Write a 100-row batch and a separate 10-row batch. | Both jobs finish successfully. The 10-row batch fails the displayed data contract. DQM is a separate, optional trial. |
-| `lab_04_review_the_fix` | Run the green contract, then use `channel_value=tv-app` to trigger a reviewable failure. | The normal value passes. The deliberate value fails, and a correct patch preserves 2 unique TV-app purchases and 2,000 cents. Optional Git-source variant exercises the PR path. |
+| `lab_04_review_the_fix` | Reproduce a bad run parameter. Separately, stage a bad Git commit with a correct run parameter. | Both can raise the same assertion. The first needs a corrected input. The second needs a source diff and a candidate run. |
 
 ## Requirements
 
@@ -29,13 +29,22 @@ databricks bundle validate -t dev --profile YOUR_PROFILE
 databricks bundle deploy -t dev --profile YOUR_PROFILE
 databricks bundle run -t dev --profile YOUR_PROFILE lab_01_green_baseline
 databricks bundle run -t dev --profile YOUR_PROFILE lab_02_schema_drift
+databricks bundle run -t dev --profile YOUR_PROFILE lab_03_silent_underfill
+databricks bundle run -t dev --profile YOUR_PROFILE lab_04_review_the_fix
 ```
 
 Use **Jobs & Pipelines → Open ZeroOps → Configure**. Ask to monitor only the named lab jobs and disposable schema and confirm the saved scope. ZeroOps also looks back over the previous 24 hours. Use **Run now with different parameters** for the failure variants below. If you open notebooks interactively, set the named text parameters indicated in their cells. A job run supplies the run evidence for ZeroOps.
 
-1. For **Lab 02**, use `feed_table=zops_feed_v2` after the successful v1 run. Save the run IDs, schema output and failed task error. Review the proposed fix against the v1 control. A v2 scratch copy using `SUM(amount_minor) AS revenue_cents` should return 2,500 cents for three USD purchases.
-2. For **Lab 03**, run `mode=baseline, batch_id=baseline_01`, then `mode=thin, batch_id=thin_01`. New IDs create new batches. Repeating the same batch and mode preserves the existing rows. For a genuine DQM trial, start in a fresh schema and follow the notebook's baseline and scan protocol before introducing underfill. DQM training and intelligent scans make detection timing variable. The direct SQL check works independently of the beta. If you lack access to DQM, record only what the job and tables show.
-3. For **Lab 04**, run the fourth bundle job with its default `channel_value=tv_app` to obtain a green acceptance run. Run it again with `channel_value=tv-app` to obtain the deliberate failure in workspace code. To compare instructions, make a second copy of the job with the same broken parameter and scope both copies. Let the first investigation start and finish, save the guidance below, then fail the second job and compare the evidence and proposed patch. Confirm the investigation reports which instructions it used. Record unavailable if ZeroOps does not produce a separate investigation.
+1. For **Lab 02**, run the defaults, then set `feed_table=zops_feed_v2` and retain `amount_column=amount_cents`. Expect SQLSTATE `42703` in the publish cell. Then keep v2 and set `amount_column=amount_minor`. Inspect the reconciliation cell for three purchases and 2,500 USD cents. Its assertion returns `NULL` on success. Compare the output's Delta history before and after the failed and recovered runs.
+2. For **Lab 03**, run `mode=baseline, batch_id=baseline_01`, then `mode=thin, batch_id=thin_01`. Replay `thin_01` with the same mode and confirm the ten rows stay ten. Try `mode=baseline, batch_id=thin_01` to verify that the mode guard rejects the conflicting reuse. Use one writer at a time per schema. For a DQM trial, use a fresh schema and follow the notebook's baseline and scan protocol. Record Training or a missing scan as pending.
+3. For **Lab 04**, use the normal value `tv_app`, then fail it with `tv-app`. Check the failed run's parameters before asking for a patch. Restore `tv_app` to confirm recovery. To compare instructions, make a second copy of the job with the same bad parameter and scope both copies. Let the first investigation finish, save the guidance below, then fail the second job. Confirm whether the second report loaded the instructions. Score both reports on the run and source evidence, the diagnosis and the action. Record unavailable if the second investigation never appears.
+
+For example, run the two Lab 02 variants from the CLI. The first command is expected to exit with an error.
+
+```bash
+databricks bundle run -t dev --profile YOUR_PROFILE --params feed_table=zops_feed_v2 lab_02_schema_drift
+databricks bundle run -t dev --profile YOUR_PROFILE --params feed_table=zops_feed_v2,amount_column=amount_minor lab_02_schema_drift
+```
 
 ### Sample investigation instructions
 
@@ -45,9 +54,11 @@ Paste this into your ZeroOps configuration through Genie Code. It applies to new
 
 ### Lab 04 Git-source variant
 
-1. Fork this repository and protect the fork's base branch against direct pushes. Create a separate, unscheduled Lakeflow Job. Add a **Notebook** task with remote **Git** as its source. Set the URL to your fork, select GitHub and set the base branch to the original lab revision. The repository-relative notebook path is `lab_04__review_the_fix.ipynb`. Use the same SQL warehouse and task parameters `catalog` and `schema` as the bundle job.
-2. Scope ZeroOps to the Git job, run it and capture the failure and run's Git SHA. A code-patch insight for a Git-backed job can offer **Create PR**. Inspect the proposal, confirm the push to a dedicated review branch, and open the PR against the protected base using the link or GitHub. Availability depends on the insight class and Git permissions.
-3. Run a separate scratch job pinned to the candidate SHA. Compare it with the original failed run. Reject a change that removes the check, admits the web purchase or converts cents into dollars. This experiment is complete when you can explain the diff and show the contract result. The PR can stay unmerged.
+1. Fork this repository and create a disposable incident branch in the fork. In `lab_04__review_the_fix.ipynb`, commit a one-line regression by replacing `WHERE channel = :channel_value` with `WHERE channel = 'tv-app'`. Protect the incident branch against direct pushes after seeding the regression. Create a separate, unscheduled Lakeflow Job with a **Notebook** task using remote **Git** as its source. Point it at the incident branch and the repository-relative notebook path. Set its warehouse, `catalog`, `schema` and `channel_value=tv_app`. Keep the input correct on both revisions.
+2. Scope ZeroOps to the Git job, run it and capture the failure and run's Git SHA. A qualifying code-patch insight can offer **Create PR**. Inspect the proposal, confirm the push to a separate review branch, then open the PR against the incident branch via the link or GitHub. If the action is absent, create a review commit manually and label its origin.
+3. Run a separate scratch job pinned to the candidate SHA with the same parameters and fixture. Reject a change that removes the assertion, admits the web purchase or changes the money units. Capture the verified result and PR link separately. You can leave the PR unmerged.
+
+For a read-only rehearsal of the Git history, the companion repository already contains the [literal typo](https://github.com/SauronShepherd/she-watch-genie-ops-zero/commit/f4590bbc04f59344084a96d104c0ce4a78a28140) and a [revision with the working parameterized predicate](https://github.com/SauronShepherd/she-watch-genie-ops-zero/commit/6c6b7b4d836865743e49b404fae20fb30fe7eb25). Pin scratch runs to those SHAs with identical inputs to isolate the source change. Use your own fork for any write or PR.
 
 ## Finish the session
 
