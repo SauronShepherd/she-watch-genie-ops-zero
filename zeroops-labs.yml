@@ -52,6 +52,9 @@ resources:
     lab_04_review_the_fix:
       name: "ZeroOps Lab 04 - Review the fix"
       max_concurrent_runs: 1
+      parameters:
+        - name: channel_value
+          default: tv_app
       tasks:
         - task_key: verify_channel_contract
           max_retries: 0
@@ -61,3 +64,4 @@ resources:
             base_parameters:
               catalog: ${var.catalog}
               schema: ${var.schema}
+              channel_value: tv_app
