@@ -1,0 +1,63 @@
+resources:
+  jobs:
+    lab_01_green_baseline:
+      name: "ZeroOps Lab 01 - Green baseline"
+      max_concurrent_runs: 1
+      tasks:
+        - task_key: seed_and_check
+          max_retries: 0
+          notebook_task:
+            notebook_path: ./lab_01__green_baseline.ipynb
+            warehouse_id: ${var.warehouse_id}
+            base_parameters:
+              catalog: ${var.catalog}
+              schema: ${var.schema}
+
+    lab_02_schema_drift:
+      name: "ZeroOps Lab 02 - Schema drift"
+      max_concurrent_runs: 1
+      parameters:
+        - name: catalog
+          default: ${var.catalog}
+        - name: schema
+          default: ${var.schema}
+        - name: feed_table
+          default: zops_feed_v1
+      tasks:
+        - task_key: publish_daily_revenue
+          max_retries: 0
+          notebook_task:
+            notebook_path: ./lab_02__schema_drift.ipynb
+            warehouse_id: ${var.warehouse_id}
+
+    lab_03_silent_underfill:
+      name: "ZeroOps Lab 03 - Silent underfill"
+      max_concurrent_runs: 1
+      parameters:
+        - name: catalog
+          default: ${var.catalog}
+        - name: schema
+          default: ${var.schema}
+        - name: mode
+          default: baseline
+        - name: batch_id
+          default: sample_01
+      tasks:
+        - task_key: load_and_inspect
+          max_retries: 0
+          notebook_task:
+            notebook_path: ./lab_03__silent_underfill.ipynb
+            warehouse_id: ${var.warehouse_id}
+
+    lab_04_review_the_fix:
+      name: "ZeroOps Lab 04 - Review the fix"
+      max_concurrent_runs: 1
+      tasks:
+        - task_key: verify_channel_contract
+          max_retries: 0
+          notebook_task:
+            notebook_path: ./lab_04__review_the_fix.ipynb
+            warehouse_id: ${var.warehouse_id}
+            base_parameters:
+              catalog: ${var.catalog}
+              schema: ${var.schema}
